@@ -1,9 +1,49 @@
 #include<iostream>
 #include <stdio.h>
 #include<WinSock2.h>
+#include<thread>
 #pragma warning(disable:4996)
 #pragma comment(lib, "Ws2_32.lib")
 using namespace std;
+#define buflen 256
+
+int serverthread(LPVOID lpParameter , int i)
+{
+	SOCKET* clntsock = (SOCKET*)lpParameter;
+	int revres = 0;
+	int j;
+	if (i == 0)
+		j = 1;
+	else
+		j = 0;
+	do {
+		char buf[buflen] = "";
+		//读信息缓冲区
+		revres = recv(clntsock[i], buf, buflen, 0);//accept的返回值!!!
+		if (revres > 0)
+		{
+			printf("Bytes received: %d\n", revres);
+			cout << buf << endl;
+
+			//转发给另一个clint
+				int tranres = send(clntsock[j], buf, strlen(buf), 0);
+				if (tranres == SOCKET_ERROR)
+				{
+					printf("transform failed: %d\n", WSAGetLastError());
+					closesocket(clntsock[j]);
+					WSACleanup();
+					return 1;
+				}
+			}
+			else if (revres == 0)
+				printf("Connection closed\n");
+			else
+				printf("recv failed: %d\n", WSAGetLastError());
+
+		} while (revres > 0);
+		//closesocket(*clntsock);
+}
+
 int main()
 {
 	WSADATA wsadata;
@@ -40,7 +80,6 @@ int main()
 		return -1;
 	}
 
-	//多线程考虑在这里改进成一个数组，先暂时这样放着，单线程操作
 	SOCKET clntsock[2];
 	for (int i = 0; i < 2; i++)
 	{
@@ -61,60 +100,23 @@ int main()
 			//cout << client_addr.sin_addr.s_addr << endl;
 		}
 	}
+	thread th[2];
+	for (int i = 0; i < 2; i++)
+	{
+		th[i] = thread(serverthread, clntsock, i);
+	}
+	for (int i = 0; i < 2; i++)
+	{
+		th[i].join();
+	}
 
-#define buflen 256
-		int revres = 0;
-		const char* okmsg = "we accept your message successfully~ great!";
-		int i = 0;
-		int j = 1;
-		do{
-			char buf[buflen] = "";
-			//读信息缓冲区
-			revres = recv(clntsock[i], buf, buflen, 0);//accept的返回值!!!
-			if (revres > 0)
-			{
-				printf("Bytes received: %d\n", revres);
-				cout << buf << endl;
-
-				/*int iSendResult = send(clntsock[i], okmsg, strlen(okmsg), 0);
-				if (iSendResult == SOCKET_ERROR) 
-				{
-				printf("send failed: %d\n", WSAGetLastError());
-				closesocket(clntsock[i]);
-				WSACleanup();
-				return 1;
-				}*/
-			//转发给另一个clint
-				int tranres = send(clntsock[j], buf, strlen(buf), 0);
-				if (tranres == SOCKET_ERROR) 
-				{
-					printf("transform failed: %d\n", WSAGetLastError());
-					closesocket(clntsock[j]);
-					WSACleanup();
-					return 1;
-				}
-			}
-			else if (revres == 0)
-				printf("Connection closed\n");
-			else
-				printf("recv failed: %d\n", WSAGetLastError());
-
-			if (i == 0)
-			{
-				i = 1; j = 0;
-			}
-			else
-			{
-				i = 0; j = 1;
-			}
-		} while (revres > 0);
-		int finalres = closesocket(servsock);
-		if (finalres != 0)
-		{
-			cout << "server socket close error!";
-			WSACleanup();
-			return -1;
-		}
+	int finalres = closesocket(servsock);
+	if (finalres != 0)
+	{
+		cout << "server socket close error!";
+		WSACleanup();
+		return -1;
+	}
 
 		return 0;
 }
