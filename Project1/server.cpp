@@ -22,8 +22,32 @@ int serverthread(LPVOID lpParameter , int i)
 		revres = recv(clntsock[i], buf, buflen, 0);//accept的返回值!!!
 		if (revres > 0)
 		{
+			string temp = string(buf);
+			int lennum = 0;
+			for (int i = 0;; i++)
+			{
+				if (!isdigit(temp[i + 11]))
+					break;
+				lennum++;
+			}
+			int namelen = atoi(temp.substr(11, lennum).c_str());
+			char* t1 = new char[20];
+			strcpy(t1, temp.substr(11 + lennum, namelen).c_str());
+			const char* name = (const char*)t1;
+			char* t2 = new char[20];
+			strcpy(t2, temp.substr(11 + lennum + namelen, 5).c_str());
+			const char* code = (const char*)t2;
+			time_t sendtime = atoi(temp.substr(16 + lennum + namelen, 10).c_str());
+			int headsize = 26 + lennum + namelen;
+
 			printf("Bytes received: %d\n", revres);
-			cout << buf << endl;
+			cout << "from: " << name << endl;
+			cout << "message: " << temp.substr(headsize, strlen(buf) - headsize) << endl;
+			struct tm* ptminfo;
+			ptminfo = localtime(&sendtime);
+			printf("time: %02d-%02d-%02d %02d:%02d:%02d\n",
+				ptminfo->tm_year + 1900, ptminfo->tm_mon + 1, ptminfo->tm_mday,
+				ptminfo->tm_hour, ptminfo->tm_min, ptminfo->tm_sec);
 
 			//转发给另一个clint
 				int tranres = send(clntsock[j], buf, strlen(buf), 0);
